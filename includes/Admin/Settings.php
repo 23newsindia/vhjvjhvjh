@@ -106,6 +106,14 @@ class Settings {
                 'description' => __('Enter one file per line. Use complete URLs or file names.', 'remove-unused-css')
             ]
         );
+
+        // Cache Section
+        add_settings_section(
+            'rucs_cache_section',
+            __('Cache Management', 'remove-unused-css'),
+            [$this, 'render_cache_stats'],
+            $this->page_slug
+        );
     }
 
     /**
@@ -176,6 +184,38 @@ class Settings {
     }
 
     /**
+     * Render cache stats section
+     */
+    public function render_cache_stats() {
+        $cache_manager = new \RemoveUnusedCSS\Manager\CacheManager(
+            new \RemoveUnusedCSS\Database\Queries\UsedCSS(),
+            new \RemoveUnusedCSS\Frontend\Filesystem()
+        );
+        
+        $stats = $cache_manager->get_stats();
+        ?>
+        <div class="rucs-cache-stats">
+            <h3><?php _e('Cache Statistics', 'remove-unused-css'); ?></h3>
+            <ul>
+                <li><?php printf(__('Total URLs processed: %d', 'remove-unused-css'), $stats['total']); ?></li>
+                <li><?php printf(__('Completed: %d', 'remove-unused-css'), $stats['completed']); ?></li>
+                <li><?php printf(__('Pending: %d', 'remove-unused-css'), $stats['pending']); ?></li>
+                <li><?php printf(__('Cache size: %s', 'remove-unused-css'), $stats['size']); ?></li>
+            </ul>
+            
+            <p>
+                <button type="button" 
+                        class="button button-secondary rcs-clear-cache" 
+                        data-nonce="<?php echo wp_create_nonce('rucs_clear_cache'); ?>">
+                    <?php _e('Clear All Cache', 'remove-unused-css'); ?>
+                </button>
+                <span class="spinner" style="float: none; display: inline-block;"></span>
+            </p>
+        </div>
+        <?php
+    }
+
+    /**
      * Sanitize options before saving
      *
      * @param array $input
@@ -207,107 +247,41 @@ class Settings {
         ];
     }
 
-  
-  
-    // Add these methods to the existing Settings class
-
-/**
- * Render cache stats section
- */
-public function render_cache_stats() {
-    $cache_manager = new \RemoveUnusedCSS\Manager\CacheManager(
-        new \RemoveUnusedCSS\Database\Queries\UsedCSS(),
-        new \RemoveUnusedCSS\Frontend\Filesystem()
-    );
-    
-    $stats = $cache_manager->get_stats();
-    ?>
-    <div class="rucs-cache-stats">
-        <h3><?php _e('Cache Statistics', 'remove-unused-css'); ?></h3>
-        <ul>
-            <li><?php printf(__('Total URLs processed: %d', 'remove-unused-css'), $stats['total']); ?></li>
-            <li><?php printf(__('Completed: %d', 'remove-unused-css'), $stats['completed']); ?></li>
-            <li><?php printf(__('Pending: %d', 'remove-unused-css'), $stats['pending']); ?></li>
-            <li><?php printf(__('Cache size: %s', 'remove-unused-css'), $stats['size']); ?></li>
-        </ul>
-        
-        <p>
-            <button type="button" 
-                    class="button button-secondary rcs-clear-cache" 
-                    data-nonce="<?php echo wp_create_nonce('rucs_clear_cache'); ?>">
-                <?php _e('Clear All Cache', 'remove-unused-css'); ?>
-            </button>
-            <span class="spinner" style="float: none; display: inline-block;"></span>
-        </p>
-    </div>
-    <?php
-}
-
-  
-  
-  
-  
     /**
      * Enqueue admin assets
      *
      * @param string $hook
      */
-    /**
- * Enqueue admin scripts
- */
-public function enqueue_assets($hook) {
-    if ($hook !== $this->page_hook) {
-        return;
+    public function enqueue_assets($hook) {
+        if ($hook !== $this->page_hook) {
+            return;
+        }
+
+        wp_enqueue_style(
+            'rucs-admin',
+            plugins_url('assets/css/admin.css', dirname(__FILE__)),
+            [],
+            RUCS_VERSION
+        );
+
+        wp_enqueue_script(
+            'rucs-admin',
+            plugins_url('assets/js/admin.js', dirname(__FILE__)),
+            ['jquery'],
+            RUCS_VERSION,
+            true
+        );
+
+        wp_localize_script(
+            'rucs-admin',
+            'rucsAdmin',
+            [
+                'ajaxurl' => admin_url('admin-ajax.php'),
+                'clearCacheNonce' => wp_create_nonce('rucs_clear_cache'),
+                'processingText' => __('Processing...', 'remove-unused-css'),
+                'successText' => __('Cache cleared successfully', 'remove-unused-css'),
+                'errorText' => __('Error clearing cache', 'remove-unused-css')
+            ]
+        );
     }
-
-    wp_enqueue_style(
-        'rucs-admin',
-        plugins_url('assets/css/admin.css', dirname(__FILE__)),
-        [],
-        RUCS_VERSION
-    );
-
-    wp_enqueue_script(
-        'rucs-admin',
-        plugins_url('assets/js/admin.js', dirname(__FILE__)),
-        ['jquery'],
-        RUCS_VERSION,
-        true
-    );
-
-    wp_localize_script(
-        'rucs-admin',
-        'rucsAdmin',
-        [
-            'ajaxurl' => admin_url('admin-ajax.php'),
-            'clearCacheNonce' => wp_create_nonce('rucs_clear_cache'),
-            'processingText' => __('Processing...', 'remove-unused-css'),
-            'successText' => __('Cache cleared successfully', 'remove-unused-css'),
-            'errorText' => __('Error clearing cache', 'remove-unused-css')
-        ]
-    );
-}
-
-// Add to register_settings():
-add_settings_section(
-    'rucs_cache_section',
-    __('Cache Management', 'remove-unused-css'),
-    [$this, 'render_cache_stats'],
-    $this->page_slug
-);
-  
-  
-  
-  
-  
-  
-
-
-  
-  
-  
-  
-  
-  
-  
 }

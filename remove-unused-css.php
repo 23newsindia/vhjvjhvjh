@@ -19,6 +19,8 @@ define('RUCS_VERSION', '1.0.0');
 
 // Autoload classes
 require_once RUCS_PLUGIN_DIR . 'vendor/autoload.php';
+
+// Load core files
 require_once RUCS_PLUGIN_DIR . 'includes/Database/Tables/UsedCSS.php';
 require_once RUCS_PLUGIN_DIR . 'includes/Database/Queries/UsedCSS.php';
 require_once RUCS_PLUGIN_DIR . 'includes/Frontend/Filesystem.php';
@@ -28,6 +30,7 @@ require_once RUCS_PLUGIN_DIR . 'includes/Admin/Options/Options_Data.php';
 require_once RUCS_PLUGIN_DIR . 'includes/Admin/Settings.php';
 require_once RUCS_PLUGIN_DIR . 'includes/Admin/Subscriber.php';
 require_once RUCS_PLUGIN_DIR . 'includes/Admin/Ajax.php';
+require_once RUCS_PLUGIN_DIR . 'includes/Manager/CacheManager.php';
 
 // Initialize the plugin
 add_action('plugins_loaded', function() {
@@ -56,6 +59,7 @@ add_action('plugins_loaded', function() {
     }
 });
 
+// Register activation hook
 register_activation_hook(__FILE__, function() {
     // Create database tables
     $used_css_table = new Database\Tables\UsedCSS();
@@ -68,6 +72,7 @@ register_activation_hook(__FILE__, function() {
     }
 });
 
+// Register deactivation hook
 register_deactivation_hook(__FILE__, function() {
     // Clean up on deactivation
     $queue = new Frontend\BackgroundQueue();

@@ -5,89 +5,60 @@ use RemoveUnusedCSS\Database\Queries\UsedCSS;
 use RemoveUnusedCSS\Frontend\Filesystem;
 
 class CacheManager {
-    /**
-     * Used CSS query
-     *
-     * @var UsedCSS
-     */
     private $used_css_query;
-
-    /**
-     * Filesystem handler
-     *
-     * @var Filesystem
-     */
     private $filesystem;
+    private $varnish_cache;
 
-    /**
-     * Constructor
-     *
-     * @param UsedCSS $used_css_query
-     * @param Filesystem $filesystem
-     */
     public function __construct(UsedCSS $used_css_query, Filesystem $filesystem) {
         $this->used_css_query = $used_css_query;
         $this->filesystem = $filesystem;
+        
+        // Initialize Varnish cache if available
+        if (class_exists('ClpVarnishCacheManager')) {
+            $this->varnish_cache = new \ClpVarnishCacheManager();
+        }
     }
 
-    /**
-     * Clear all cached CSS
-     *
-     * @return bool
-     */
     public function clear_all_cache() {
+        global $wpdb;
+        
         // Clear database entries
-        $result = $this->used_css_query->query([
-            'status' => 'completed',
-            'fields' => 'ids'
-        ]);
-
-        if (!empty($result)) {
-            foreach ($result as $id) {
-                $this->used_css_query->delete_item($id);
-            }
+        $table = $wpdb->prefix . 'rucs_used_css';
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table'") === $table) {
+            $wpdb->query("TRUNCATE TABLE $table");
         }
 
         // Clear filesystem cache
-        return $this->filesystem->clear_cache();
-    }
+        $this->filesystem->clear_cache();
 
-    /**
-     * Clear cache for specific URL
-     *
-     * @param string $url
-     * @return bool
-     */
-    public function clear_url_cache($url) {
-        $items = $this->used_css_query->query([
-            'url' => $url,
-            'fields' => 'ids'
-        ]);
-
-        if (empty($items)) {
-            return false;
-        }
-
-        foreach ($items as $id) {
-            $this->used_css_query->delete_item($id);
+        // Clear Varnish cache if available
+        if ($this->varnish_cache && $this->varnish_cache->is_enabled()) {
+            $this->varnish_cache->purge_tag('css');
         }
 
         return true;
     }
 
-    /**
-     * Get cache stats
-     *
-     * @return array
-     */
     public function get_stats() {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rucs_used_css';
+        
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table'") !== $table) {
+            return [
+                'total' => 0,
+                'completed' => 0,
+                'pending' => 0,
+                'size' => '0 MB'
+            ];
+        }
+        
+        $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table");
+        $completed = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table WHERE status = 'completed'");
+        
         return [
-            'total' => $this->used_css_query->count(),
-            'completed' => $this->used_css_query->get_completed_count(),
-            'pending' => $this->used_css_query->query([
-                'status' => 'pending',
-                'count' => true
-            ]),
+            'total' => $total,
+            'completed' => $completed,
+            'pending' => $total - $completed,
             'size' => $this->filesystem->get_cache_size()
         ];
     }
